@@ -826,6 +826,66 @@ SJPEG_TEST(Progressive) {
 }
 #endif  // !SJPEG_NO_PROGRESSIVE
 
+SJPEG_TEST(MultiThreaded) {
+  const int kWidth = 320, kHeight = 240;
+  const std::vector<uint8_t> rgb = MakeRGB(kWidth, kHeight);
+
+  for (int threads : {1, 2, 4, 8}) {
+    for (int method : {0, 1, 4}) {
+      sjpeg::EncoderParam param;
+      param.SetQuality(80.0f);
+      param.num_threads = threads;
+      param.restart_interval = 1;
+      if (method == 0) {
+        param.Huffman_compress = false;
+        param.adaptive_quantization = false;
+      } else if (method == 1) {
+        param.Huffman_compress = true;
+        param.adaptive_quantization = false;
+      } else if (method == 4) {
+        param.Huffman_compress = true;
+        param.adaptive_quantization = true;
+      }
+
+      std::string out;
+      SJPEG_CHECK(EncodeRGB(rgb, kWidth, kHeight, param, &out));
+      SJPEG_CHECK(!out.empty());
+      SJPEG_CHECK(HasSize(out, kWidth, kHeight));
+    }
+  }
+
+  // Odd dimensions with clipping
+  const int kOddW = 333, kOddH = 217;
+  const std::vector<uint8_t> odd_rgb = MakeRGB(kOddW, kOddH);
+  for (int threads : {1, 3, 7}) {
+    sjpeg::EncoderParam param;
+    param.SetQuality(85.0f);
+    param.num_threads = threads;
+    param.restart_interval = 2;
+
+    std::string out;
+    SJPEG_CHECK(EncodeRGB(odd_rgb, kOddW, kOddH, param, &out));
+    SJPEG_CHECK(!out.empty());
+    SJPEG_CHECK(HasSize(out, kOddW, kOddH));
+  }
+
+  // Different YUV modes
+  const int kW = 128, kH = 128;
+  const std::vector<uint8_t> sq_rgb = MakeRGB(kW, kH);
+  for (SjpegYUVMode mode : {SJPEG_YUV_420, SJPEG_YUV_444, SJPEG_YUV_400}) {
+    sjpeg::EncoderParam param;
+    param.SetQuality(85.0f);
+    param.yuv_mode = mode;
+    param.num_threads = 4;
+    param.restart_interval = 1;
+
+    std::string out;
+    SJPEG_CHECK(EncodeRGB(sq_rgb, kW, kH, param, &out));
+    SJPEG_CHECK(!out.empty());
+    SJPEG_CHECK(HasSize(out, kW, kH));
+  }
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {

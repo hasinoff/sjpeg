@@ -335,6 +335,12 @@ void Encoder::SinglePassScan() {
   int16_t* in = in_blocks_;
   const QuantizeBlockFunc quantize_block = use_trellis_ ? TrellisQuantizeBlock
                                                         : quantize_block_;
+  const int rows_per_interval = restart_interval_;
+  const int total_intervals =
+      (rows_per_interval > 0)
+          ? (mb_h_ + rows_per_interval - 1) / rows_per_interval
+          : 0;
+
   for (int mb_y = 0; mb_y < mb_h_; ++mb_y) {
     for (int mb_x = 0; mb_x < mb_w_; ++mb_x) {
       if (!CheckBuffers()) return;
@@ -348,6 +354,16 @@ void Encoder::SinglePassScan() {
           CodeBlock(&base_coeffs, base_run_levels);
           in += 64;
         }
+      }
+    }
+    if (rows_per_interval > 0 && ((mb_y + 1) % rows_per_interval == 0)) {
+      const int interval_idx = (mb_y + 1) / rows_per_interval - 1;
+      if (interval_idx < total_intervals - 1) {
+        bw_.Flush();
+        const uint8_t rst_marker[2] = {
+            0xff, static_cast<uint8_t>(0xd0 + (interval_idx % 8))};
+        bw_.PutBytes(rst_marker, 2);
+        ResetDCs();
       }
     }
   }
@@ -497,12 +513,27 @@ void Encoder::SinglePassEncode() {
   // baseline coding
   WriteSOF();
 
-  if (optimize_size_) {
-    SinglePassScanOptimized();
+  if (restart_interval_ > 0) {
+    WriteDRI(restart_interval_ * mb_w_);
+  }
+
+  const int num_threads = std::min(num_threads_, mb_h_);
+  if (num_threads > 1 && mb_h_ > 1) {
+    if (optimize_size_) {
+      SinglePassScanOptimizedMultiThreaded(num_threads, restart_interval_);
+    } else {
+      WriteDHT();
+      WriteSOS();
+      SinglePassScanMultiThreaded(num_threads, restart_interval_);
+    }
   } else {
-    WriteDHT();
-    WriteSOS();
-    SinglePassScan();
+    if (optimize_size_) {
+      SinglePassScanOptimized();
+    } else {
+      WriteDHT();
+      WriteSOS();
+      SinglePassScan();
+    }
   }
 }
 

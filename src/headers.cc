@@ -228,6 +228,19 @@ void Encoder::WriteDHT() {
   }
 }
 
+void Encoder::WriteDRI(uint16_t restart_interval) {
+  if (restart_interval == 0) return;
+  const uint8_t kDRIHeader[] = {0xff,
+                                0xdd,
+                                0x00,
+                                0x04,
+                                static_cast<uint8_t>(restart_interval >> 8),
+                                static_cast<uint8_t>(restart_interval & 0xff)};
+  ok_ = ok_ && bw_.Reserve(sizeof(kDRIHeader));
+  if (!ok_) return;
+  bw_.PutBytes(kDRIHeader, sizeof(kDRIHeader));
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 void Encoder::WriteSOS() {   // SOS

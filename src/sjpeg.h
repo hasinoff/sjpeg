@@ -215,6 +215,8 @@ struct EncoderParam {
   bool adaptive_quantization;   // if true, use optimized quantizer matrices.
   bool adaptive_bias;           // if true, use perceptual bias adaptation
   bool use_trellis;             // if true, use trellis-based optimization
+  int num_threads;              // number of worker threads (default: 1)
+  int restart_interval;  // restart interval in MCU rows (0 = auto / 1 row)
 
   // target size or distortion
   typedef enum {

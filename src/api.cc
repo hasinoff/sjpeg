@@ -100,6 +100,8 @@ void EncoderParam::Init(float quality_factor) {
   tolerance = 1.;
   qmin = 0.;
   qmax = 100.;
+  num_threads = 1;
+  restart_interval = 0;
 }
 
 void EncoderParam::SetQuality(float quality_factor) {
@@ -176,6 +178,12 @@ bool Encoder::InitFromParam(const EncoderParam& param) {
     search_hook_ = (param.search_hook == nullptr) ? &default_hook_
                                                   : param.search_hook;
     if (!search_hook_->Setup(param)) return false;
+  }
+
+  num_threads_ = (param.num_threads < 1) ? 1 : param.num_threads;
+  restart_interval_ = param.restart_interval;
+  if (num_threads_ > 1 && restart_interval_ <= 0) {
+    restart_interval_ = 1;
   }
 
   assert(memory_hook_ == (param.memory == nullptr ? GetDefaultMemoryManager()

@@ -176,6 +176,12 @@ optimized for rate-distortion).
 .TP
 .B \-no_optim
 Disable Huffman code optimization (faster processing, larger file).
+.TP
+.BI \-threads " int
+Number of worker threads to use for parallel multi-threaded encoding (default: 1).
+.TP
+.BI \-restart " int
+Restart interval in units of MCU rows (default: 1 row when multi-threading). Enables independent MCU slice encoding with DRI/RST restart markers.
 
 .SH BUGS
 Please report any bugs to the SJPEG discussion list:

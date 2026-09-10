@@ -66,6 +66,11 @@ endif()
 ## Check for SIMD extensions.
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/cpu.cmake)
 
+# Threads support.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+list(APPEND SJPEG_DEP_LIBRARIES Threads::Threads)
+
 ################################################################################
 # sjpeg source files.
 
@@ -78,6 +83,7 @@ set(SJPEG_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/src/api.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/dichotomy.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/enc.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/enc_parallel.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/encoders.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/entropy.cc
   ${CMAKE_CURRENT_SOURCE_DIR}/src/fdct.cc

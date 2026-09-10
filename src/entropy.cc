@@ -185,24 +185,25 @@ static inline void CodeACRunLevels(const RunLevel* const rl, int n,
   }
 }
 
-void Encoder::CodeBlock(const DCTCoeffs* const coeffs,
-                        const RunLevel* const rl) {
+void Encoder::CodeBlock(const DCTCoeffs* const coeffs, const RunLevel* const rl,
+                        sjpeg::BitWriter* bw) {
+  if (bw == nullptr) bw = &bw_;
   const int idx = coeffs->idx_;
   const int q_idx = quant_idx_[idx];
 
   // DC coefficient symbol
   const int dc_len = coeffs->dc_code_ & 0x0f;
   const uint32_t code = dc_codes_[q_idx][dc_len];
-  bw_.PutPackedCode(code);
+  bw->PutPackedCode(code);
   if (dc_len > 0) {
-    bw_.PutBits(coeffs->dc_code_ >> 4, dc_len);
+    bw->PutBits(coeffs->dc_code_ >> 4, dc_len);
   }
 
   // AC coeffs
   const uint32_t* const codes = ac_codes_[q_idx];
-  CodeACRunLevels(rl, coeffs->nb_coeffs_, codes, &bw_);
+  CodeACRunLevels(rl, coeffs->nb_coeffs_, codes, bw);
   if (coeffs->last_ < 63) {     // EOB
-    bw_.PutPackedCode(codes[0x00]);
+    bw->PutPackedCode(codes[0x00]);
   }
 }
 

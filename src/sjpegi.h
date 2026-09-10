@@ -346,8 +346,8 @@ struct Encoder {
 
   // return MCU samples at macroblock position (mb_x, mb_y)
   // clipped is true if the MCU is clipped and needs replication
-  virtual void GetSamples(int mb_x, int mb_y, bool clipped,
-                          int16_t* out_blocks) = 0;
+  virtual void GetSamples(int mb_x, int mb_y, bool clipped, int16_t* out_blocks,
+                          uint8_t* rep_buf = nullptr) = 0;
 
  private:
   // setters
@@ -377,6 +377,7 @@ struct Encoder {
   void WriteDQT();
   void WriteSOF(bool progressive = false);
   void WriteDHT();
+  void WriteDRI(uint16_t restart_interval);
   void WriteSOS();
   void WriteEOI();
 
@@ -440,6 +441,9 @@ struct Encoder {
 
   void SinglePassScan();           // finalizing scan
   void SinglePassScanOptimized();  // optimize the Huffman table + finalize scan
+  void SinglePassScanMultiThreaded(int num_threads, int rows_per_interval);
+  void SinglePassScanOptimizedMultiThreaded(int num_threads,
+                                            int rows_per_interval);
 
   void SinglePassEncode();         // non-iterating encoding pass
 
@@ -470,7 +474,8 @@ struct Encoder {
   static QuantizeErrorFunc quantize_error_;
   static QuantizeErrorFunc GetQuantizeErrorFunc();
 
-  void CodeBlock(const DCTCoeffs* const coeffs, const RunLevel* const rl);
+  void CodeBlock(const DCTCoeffs* const coeffs, const RunLevel* const rl,
+                 sjpeg::BitWriter* bw = nullptr);
   // returns DC code (4bits for length, 12bits for suffix), updates DC_predictor
   static uint16_t GenerateDCDiffCode(int DC, int* const DC_predictor);
 
@@ -508,10 +513,12 @@ struct Encoder {
   const uint8_t* GetReplicatedSamples(const uint8_t* rgb,    // block source
                                       int rgb_step,          // stride in source
                                       int sub_w, int sub_h,  // sub-block size
-                                      int w, int h);         // size of mcu
+                                      int w, int h,          // size of mcu
+                                      uint8_t* rep_buf = nullptr);
   // Replicate a 16x16 sub-block similarly.
   const uint8_t* GetReplicatedYSamples(const uint8_t* in, int step,
-                                       int sub_w, int sub_h);
+                                       int sub_w, int sub_h,
+                                       uint8_t* rep_buf = nullptr);
   // set blocks that are totally outside of the picture to an average value
   void AverageExtraLuma(int sub_w, int sub_h, int16_t* out);
   uint8_t replicated_buffer_[4 * 16 * 16];  // tmp buffer for replication
@@ -551,6 +558,9 @@ struct Encoder {
   bool use_extra_memory_;     // save the unquantized coeffs (method 3, 4)
   bool reuse_run_levels_;     // save quantized run/levels   (method 1, 4, 5)
   bool use_trellis_;          // use trellis-quantization    (method 7, 8)
+
+  int num_threads_ = 1;       // number of worker threads for parallel scan
+  int restart_interval_ = 0;  // restart interval in MCU rows (0 = disabled)
 
   int q_bias_;           // [0..255]: rounding bias for quant. of AC coeffs.
   Quantizer quants_[2];  // quant matrices

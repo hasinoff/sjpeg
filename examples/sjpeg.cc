@@ -143,6 +143,8 @@ int main(int argc, char * argv[]) {
     "  -qmin <float> ...... minimum acceptable quality factor during search\n"
     "  -qmax <float> ...... maximum acceptable quality factor during search\n"
     "  -tolerance <float> . tolerance for convergence during search\n"
+    "  -threads <int> ..... number of worker threads (default: 1)\n"
+    "  -restart <int> ..... restart interval in MCU rows (default: 1 row when threaded)\n"
     "\n"
     "  -gray .............. shortcut for '-yuv_mode 4'\n"
     "  -444 ............... shortcut for '-yuv_mode 3'\n"
@@ -250,6 +252,10 @@ int main(int argc, char * argv[]) {
       param.yuv_mode = SJPEG_YUV_420;
     } else if (!strcmp(argv[c], "-gray")) {
       param.yuv_mode = SJPEG_YUV_400;
+    } else if (!strcmp(argv[c], "-threads") && c + 1 < argc) {
+      param.num_threads = atoi(argv[++c]);
+    } else if (!strcmp(argv[c], "-restart") && c + 1 < argc) {
+      param.restart_interval = atoi(argv[++c]);
     } else if (!strcmp(argv[c], "-i") || !strcmp(argv[c], "-info")) {
       info = true;
     } else if (!strcmp(argv[c], "-quiet")) {
