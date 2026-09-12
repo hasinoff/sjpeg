@@ -216,6 +216,12 @@ struct EncoderParam {
   bool adaptive_bias;           // if true, use perceptual bias adaptation
   bool use_trellis;             // if true, use trellis-based optimization
 
+  // Emit restart markers (RST0-RST7) every 'restart_interval_rows' MCU rows.
+  // Any value <= 0 (the default) disables them. Note the unit is MCU *rows*:
+  // libjpeg's cinfo.restart_interval counts MCUs instead (its row-based
+  // equivalent is spelled cinfo.restart_in_rows).
+  int restart_interval_rows;
+
   // target size or distortion
   typedef enum {
     TARGET_NONE = 0,

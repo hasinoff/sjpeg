@@ -328,6 +328,21 @@ void Encoder::CollectCoeffs() {
 ////////////////////////////////////////////////////////////////////////////////
 // 1-pass Scan
 
+void Encoder::EmitRestartMarker(int interval_idx) {
+  // No Reserve() is needed here: every caller runs inside a scan loop that has
+  // just called CheckBuffers(), which reserves more room than the largest
+  // possible MCU can consume, leaving ample slack for these 2 bytes.
+  bw_.Flush();
+  const uint8_t rst_marker[2] = {
+      0xff, static_cast<uint8_t>(0xd0 + (interval_idx & 7))};
+  bw_.PutBytes(rst_marker, 2);
+  // Required by SinglePassScan(), which codes DC differentially off DCs_[].
+  // On the FinalPassScan() path the DC codes are already baked into
+  // DCTCoeffs::dc_code_ (see StoreRunLevels(), which performs its own reset),
+  // so this is a no-op there.
+  ResetDCs();
+}
+
 void Encoder::SinglePassScan() {
   ResetDCs();
 
@@ -350,6 +365,12 @@ void Encoder::SinglePassScan() {
         }
       }
     }
+    // Skip the marker after the very last MCU row: a scan must not end on a
+    // restart marker.
+    if (restart_interval_rows_ > 0 &&
+        (mb_y + 1) % restart_interval_rows_ == 0 && mb_y + 1 < mb_h_) {
+      EmitRestartMarker((mb_y + 1) / restart_interval_rows_ - 1);
+    }
   }
 }
 
@@ -358,10 +379,19 @@ void Encoder::FinalPassScan(size_t nb_mbs, const DCTCoeffs* coeffs) {
   if (!CheckBuffers()) return;  // call needed to finalize all_run_levels_
   assert(reuse_run_levels_);
   const RunLevel* run_levels = all_run_levels_;
+  const size_t blocks_per_interval =
+      (restart_interval_rows_ > 0)
+          ? static_cast<size_t>(restart_interval_rows_) * mb_w_ * mcu_blocks_
+          : 0;
+  int interval_idx = 0;
   for (size_t n = 0; n < nb_mbs; ++n) {
     if (!CheckBuffers()) return;
     CodeBlock(&coeffs[n], run_levels);
     run_levels += coeffs[n].nb_coeffs_;
+    if (restart_interval_rows_ > 0 && (n + 1) % blocks_per_interval == 0 &&
+        n + 1 < nb_mbs) {
+      EmitRestartMarker(interval_idx++);
+    }
   }
 }
 
@@ -408,6 +438,10 @@ void Encoder::SinglePassScanOptimized() {
         }
       }
     }
+    if (restart_interval_rows_ > 0 &&
+        (mb_y + 1) % restart_interval_rows_ == 0) {
+      ResetDCs();
+    }
   }
 
   CompileEntropyStats();
@@ -451,6 +485,15 @@ bool Encoder::Encode() {
   mb_h_ = (H_ + (block_h_ - 1)) / block_h_;
   mb_x_max_ = W_ / block_w_;
   mb_y_max_ = H_ / block_h_;
+  // DRI stores the interval as a 16-bit count of MCUs, so a row-based interval
+  // can't exceed 0xffff MCUs. Clamp to the coarsest whole number of MCU rows
+  // that fits: restarts become more frequent than asked for, never less, and
+  // stay row-aligned as the scan loops and the DC resets require. Dimensions
+  // are capped at kMaxDimension, so mb_w_ <= 8192 and this is always >= 7.
+  if (restart_interval_rows_ > 0) {
+    const int max_rows = 0xffff / mb_w_;
+    if (restart_interval_rows_ > max_rows) restart_interval_rows_ = max_rows;
+  }
   const size_t nb_blocks = use_extra_memory_ ? mb_w_ * mb_h_ : 1;
   if (!AllocateBlocks(nb_blocks * mcu_blocks_)) return false;
 
@@ -496,6 +539,7 @@ void Encoder::SinglePassEncode() {
 
   // baseline coding
   WriteSOF();
+  WriteDRI();
 
   if (optimize_size_) {
     SinglePassScanOptimized();
