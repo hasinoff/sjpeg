@@ -230,21 +230,12 @@ void Encoder::LoopScan() {
         WriteDQT();
         WriteSOF();
         WriteDRI();
-        const int scan_threads = std::min(search_threads, total_intervals);
         if (optimize_size_) {
-          if (scan_threads > 1) {
-            SinglePassScanOptimizedMultiThreaded(scan_threads, total_intervals);
-          } else {
-            SinglePassScanOptimized();
-          }
+          SinglePassScanOptimized();
         } else {
           WriteDHT();
           WriteSOS();
-          if (scan_threads > 1) {
-            SinglePassScanMultiThreaded(scan_threads, total_intervals);
-          } else {
-            SinglePassScan();
-          }
+          SinglePassScan();
         }
       }
     } else
