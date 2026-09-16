@@ -623,18 +623,14 @@ bool Encoder::Encode() {
 }
 
 void Encoder::SinglePassEncode() {
-#if !defined(SJPEG_NO_MULTITHREADING)
   const int num_mcus = mb_w_ * mb_h_;
-  const int worthwhile = std::max(1, num_mcus / kMinMCUsPerThread);
-#endif
 
   if (use_adaptive_quant_) {
-    // Histogram analysis + derive optimal quant matrices
-#if !defined(SJPEG_NO_MULTITHREADING)
+    // Histogram analysis + derive optimal quant matrices. Progressive mode
+    // isn't parallelized, hence the cap to 1 slice when it applies.
     const int aq_threads =
-        (prog_luma_split_ != 64)
-            ? 1
-            : std::min({num_threads_, mb_h_, ScaledThreadLimit(num_mcus)});
+        (prog_luma_split_ != 64) ? 1 : GetNumSlices(mb_h_, num_mcus);
+#if !defined(SJPEG_NO_MULTITHREADING)
     if (aq_threads > 1) {
       CollectHistogramsMultiThreaded(aq_threads);
     } else
@@ -660,12 +656,10 @@ void Encoder::SinglePassEncode() {
   WriteSOF();
   WriteDRI();
 
-#if !defined(SJPEG_NO_MULTITHREADING)
   const int total_intervals = TotalRestartIntervals();
-  const int scan_worthwhile =
-      have_coeffs_ ? ScaledThreadLimit(num_mcus) : worthwhile;
   const int num_threads =
-      std::min({num_threads_, total_intervals, scan_worthwhile});
+      GetNumSlices(total_intervals, num_mcus, have_coeffs_ ? 64 : 0);
+#if !defined(SJPEG_NO_MULTITHREADING)
   if (num_threads > 1) {
     if (optimize_size_) {
       SinglePassScanOptimizedMultiThreaded(num_threads, total_intervals);

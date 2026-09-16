@@ -108,14 +108,13 @@ void Encoder::LoopScan() {
   assert(use_extra_memory_);
   assert(reuse_run_levels_);
 
-#if !defined(SJPEG_NO_MULTITHREADING)
   const int num_mcus = mb_w_ * mb_h_;
-  const int aq_threads =
-      std::min({num_threads_, mb_h_, ScaledThreadLimit(num_mcus)});
+  const int aq_threads = GetNumSlices(mb_h_, num_mcus);
   const int total_intervals = TotalRestartIntervals();
   const int search_threads =
       search_hook_->for_size ? std::min(aq_threads, total_intervals)
                              : aq_threads;
+#if !defined(SJPEG_NO_MULTITHREADING)
   if (aq_threads > 1) {
     if (use_adaptive_quant_) {
       CollectHistogramsMultiThreaded(aq_threads);
