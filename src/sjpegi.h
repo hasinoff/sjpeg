@@ -389,6 +389,11 @@ struct Encoder {
   }
   size_t SliceSlabSize(int first_interval, int end_interval) const;
 
+  // Slice count for a parallel pass over [0, cap): 1 if serial, else up to
+  // num_threads_ bounded by 'cap' and a worthwhileness check on 'num_mcus'
+  // (grain <= 0: linear kMinMCUsPerThread model; else ScaledThreadLimit()).
+  int GetNumSlices(int cap, int num_mcus, int grain = 64) const;
+
   void Put16b(uint32_t size);
   void Put32b(uint32_t size);
 

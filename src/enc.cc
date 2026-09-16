@@ -266,6 +266,12 @@ size_t Encoder::SliceSlabSize(int first_interval, int end_interval) const {
   return slab;
 }
 
+#if defined(SJPEG_NO_MULTITHREADING)
+int Encoder::GetNumSlices(int /*cap*/, int /*num_mcus*/, int /*grain*/) const {
+  return 1;
+}
+#endif  // SJPEG_NO_MULTITHREADING
+
 bool Encoder::ReserveSlab() {
   // Worst-case macroblock is 24bits*64*6 coeffs = 1152 bytes, doubled by 0xff
   // stuffing, so kMaxMCUSize (2560) covers one MCU. Writer serves that out of a

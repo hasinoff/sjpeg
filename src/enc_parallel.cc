@@ -48,6 +48,14 @@ int Encoder::HardwareConcurrency() {
   return std::max(1, static_cast<int>(hw));
 }
 
+int Encoder::GetNumSlices(int cap, int num_mcus, int grain) const {
+  if (num_threads_ <= 1 || cap <= 1) return 1;
+  const int worthwhile = (grain > 0)
+                             ? ScaledThreadLimit(num_mcus, grain)
+                             : std::max(1, num_mcus / kMinMCUsPerThread);
+  return std::min({num_threads_, cap, worthwhile});
+}
+
 class Encoder::ThreadPool {
  public:
   explicit ThreadPool(int num_workers) {
