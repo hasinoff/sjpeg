@@ -535,8 +535,9 @@ struct Encoder {
     bool ok = true;
   };
 
-  // Parallel equivalents of the two scans above, slicing the image at restart
-  // interval boundaries. They emit the same bitstream, byte for byte.
+  // Parallel equivalents of the histogram pass and baseline scans. They emit
+  // the same bitstream, byte for byte.
+  void CollectHistogramsMultiThreaded(int num_threads);
   void QuantizeSlicesMultiThreaded(int num_threads, int total_intervals,
                                    std::vector<ThreadChunk>* chunks);
   void ReplaySlicesMultiThreaded(int num_threads, int total_intervals,
@@ -560,6 +561,8 @@ struct Encoder {
 
   // Histogram pass
   void CollectHistograms();
+  void CollectHistogramsSlice(int y_start, int y_end, Histo histos[2],
+                              int16_t* scratch, uint8_t* rep_buf);
 
   typedef int (*QuantizeBlockFunc)(const int16_t in[64], int idx,
                                    const Quantizer* const Q,
