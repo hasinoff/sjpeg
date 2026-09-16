@@ -48,8 +48,9 @@ int Encoder::HardwareConcurrency() {
   return std::max(1, static_cast<int>(hw));
 }
 
-int Encoder::GetNumSlices(int cap, int num_mcus, int grain) const {
+int Encoder::GetNumSlices(int cap, int grain) const {
   if (num_threads_ <= 1 || cap <= 1) return 1;
+  const int num_mcus = mb_w_ * mb_h_;
   const int worthwhile = (grain > 0)
                              ? ScaledThreadLimit(num_mcus, grain)
                              : std::max(1, num_mcus / kMinMCUsPerThread);
@@ -212,7 +213,9 @@ void Encoder::CollectHistogramsMultiThreaded(int num_threads) {
   std::unique_ptr<HistoWorker[]> workers(
       new (std::nothrow) HistoWorker[num_threads - 1]);
   if (workers == nullptr) {
-    CollectHistograms();
+    ResetHisto();
+    CollectHistogramsSlice(0, mb_h_, histos_, in_blocks_, replicated_buffer_);
+    have_coeffs_ = use_extra_memory_;
     return;
   }
 

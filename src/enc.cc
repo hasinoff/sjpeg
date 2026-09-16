@@ -267,7 +267,7 @@ size_t Encoder::SliceSlabSize(int first_interval, int end_interval) const {
 }
 
 #if defined(SJPEG_NO_MULTITHREADING)
-int Encoder::GetNumSlices(int /*cap*/, int /*num_mcus*/, int /*grain*/) const {
+int Encoder::GetNumSlices(int /*cap*/, int /*grain*/) const {
   return 1;
 }
 #endif  // SJPEG_NO_MULTITHREADING
@@ -367,7 +367,7 @@ void Encoder::CollectCoeffsSlice(int y_start, int y_end, uint8_t* rep_buf) {
 
 void Encoder::CollectCoeffs() {
 #if !defined(SJPEG_NO_MULTITHREADING)
-  const int num_slices = GetNumSlices(mb_h_, mb_w_ * mb_h_);
+  const int num_slices = GetNumSlices(mb_h_);
   if (num_slices > 1) {
     CollectCoeffsMultiThreaded(num_slices);
     return;
@@ -518,8 +518,8 @@ bool Encoder::ReplayScanSlice(int first_interval, int end_interval,
 void Encoder::SinglePassScan() {
   const int total_intervals = TotalRestartIntervals();
 #if !defined(SJPEG_NO_MULTITHREADING)
-  const int num_slices = GetNumSlices(total_intervals, mb_w_ * mb_h_,
-                                      have_coeffs_ ? 64 : 0);
+  const int num_slices =
+      GetNumSlices(total_intervals, have_coeffs_ ? 64 : 0);
   if (num_slices > 1) {
     SinglePassScanMultiThreaded(num_slices, total_intervals);
     return;
@@ -548,8 +548,8 @@ void Encoder::FinalPassScan(size_t nb_mbs, const DCTCoeffs* coeffs) {
 void Encoder::SinglePassScanOptimized() {
   const int total_intervals = TotalRestartIntervals();
 #if !defined(SJPEG_NO_MULTITHREADING)
-  const int num_slices = GetNumSlices(total_intervals, mb_w_ * mb_h_,
-                                      have_coeffs_ ? 64 : 0);
+  const int num_slices =
+      GetNumSlices(total_intervals, have_coeffs_ ? 64 : 0);
   if (num_slices > 1) {
     SinglePassScanOptimizedMultiThreaded(num_slices, total_intervals);
     return;

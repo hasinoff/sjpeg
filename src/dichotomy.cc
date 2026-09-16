@@ -108,12 +108,12 @@ void Encoder::LoopScan() {
   assert(use_extra_memory_);
   assert(reuse_run_levels_);
 
-  const int num_mcus = mb_w_ * mb_h_;
-  const int aq_threads = GetNumSlices(mb_h_, num_mcus);
+#if !defined(SJPEG_NO_MULTITHREADING)
   const int total_intervals = TotalRestartIntervals();
   const int search_threads =
-      search_hook_->for_size ? std::min(aq_threads, total_intervals)
-                             : aq_threads;
+      search_hook_->for_size ? GetNumSlices(total_intervals)
+                             : GetNumSlices(mb_h_);
+#endif  // !SJPEG_NO_MULTITHREADING
   if (use_adaptive_quant_) {
     CollectHistograms();
   } else {
@@ -204,11 +204,12 @@ void Encoder::LoopScan() {
 #if !defined(SJPEG_NO_MULTITHREADING)
     if (search_threads > 1) {
       if (search_hook_->for_size) {
-        // As below: redo the quantization pass if the search's last try
-        // wasn't the winner.
+        // Like the serial fallback below, redo the quantization pass if the
+        // search's last try wasn't the winner.
         if (!last_is_best) {
           QuantizeSlicesMultiThreaded(search_threads, total_intervals,
                                       &chunks);
+          if (!ok_) return;
           if (optimize_size_) CompileEntropyStats();
         }
         DeallocateBlocks();
@@ -386,7 +387,7 @@ uint64_t Encoder::ComputePSNRSlice(int y_start, int y_end) const {
 
 float Encoder::ComputePSNR() const {
 #if !defined(SJPEG_NO_MULTITHREADING)
-  const int num_slices = GetNumSlices(mb_h_, mb_w_ * mb_h_);
+  const int num_slices = GetNumSlices(mb_h_);
   if (num_slices > 1) return ComputePSNRMultiThreaded(num_slices);
 #endif
   const uint64_t error = ComputePSNRSlice(0, mb_h_);
