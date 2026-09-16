@@ -123,8 +123,8 @@ void Encoder::LoopScan() {
   const size_t nb_mbs = mb_w_ * mb_h_ * mcu_blocks_;
   DCTCoeffs* base_coeffs = nullptr;
 #if !defined(SJPEG_NO_MULTITHREADING)
-  std::vector<ThreadChunk> search_chunks;
-  std::vector<ThreadChunk> best_chunks;
+  // Reused every iteration, like base_coeffs -- see the finalize step below.
+  std::vector<ThreadChunk> chunks;
   if (search_threads <= 1)
 #endif
   {
@@ -155,7 +155,7 @@ void Encoder::LoopScan() {
 #if !defined(SJPEG_NO_MULTITHREADING)
       if (search_threads > 1) {
         result = EvaluateSizeMultiThreaded(search_threads, total_intervals,
-                                           &search_chunks);
+                                           &chunks);
         if (!ok_) break;
       } else
 #endif
@@ -187,11 +187,6 @@ void Encoder::LoopScan() {
       best = fabs(result - search_hook_->target);
       best_q = search_hook_->q;
       best_result = result;
-#if !defined(SJPEG_NO_MULTITHREADING)
-      if (search_threads > 1 && search_hook_->for_size) {
-        best_chunks.swap(search_chunks);
-      }
-#endif
     }
     if (search_hook_->Update(result)) break;
   }
@@ -209,14 +204,12 @@ void Encoder::LoopScan() {
 #if !defined(SJPEG_NO_MULTITHREADING)
     if (search_threads > 1) {
       if (search_hook_->for_size) {
-        if (!last_is_best && optimize_size_) {
-          if (use_trellis_) {
-            QuantizeSlicesMultiThreaded(search_threads, total_intervals,
-                                        &best_chunks);
-          } else {
-            MergeChunkStats(best_chunks.data(), search_threads);
-          }
-          CompileEntropyStats();
+        // As below: redo the quantization pass if the search's last try
+        // wasn't the winner.
+        if (!last_is_best) {
+          QuantizeSlicesMultiThreaded(search_threads, total_intervals,
+                                      &chunks);
+          if (optimize_size_) CompileEntropyStats();
         }
         DeallocateBlocks();
         WriteDQT();
@@ -224,8 +217,7 @@ void Encoder::LoopScan() {
         WriteDRI();
         WriteDHT();
         WriteSOS();
-        ReplaySlicesMultiThreaded(search_threads, total_intervals,
-                                  &best_chunks);
+        ReplaySlicesMultiThreaded(search_threads, total_intervals, &chunks);
       } else {
         WriteDQT();
         WriteSOF();
