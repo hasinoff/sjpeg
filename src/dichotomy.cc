@@ -151,17 +151,15 @@ void Encoder::LoopScan() {
     }
 
     float result;
+    if (search_hook_->for_size) {
 #if !defined(SJPEG_NO_MULTITHREADING)
-    if (search_threads > 1) {
-      result = search_hook_->for_size
-                   ? EvaluateSizeMultiThreaded(search_threads, total_intervals,
-                                               &search_chunks)
-                   : ComputePSNRMultiThreaded(search_threads);
-      if (!ok_) break;
-    } else
+      if (search_threads > 1) {
+        result = EvaluateSizeMultiThreaded(search_threads, total_intervals,
+                                           &search_chunks);
+        if (!ok_) break;
+      } else
 #endif
-    {
-      if (search_hook_->for_size) {
+      {
         // compute pass to store coeffs / runs / dc_code_
         StoreRunLevels(base_coeffs);
         if (!ok_) break;
@@ -170,12 +168,12 @@ void Encoder::LoopScan() {
           if (use_trellis_) InitCodes(true);
         }
         result = ComputeSize(base_coeffs);
-      } else {
-        // if we're just targeting PSNR, we don't need to compute the
-        // run/levels within the loop. We just need to quantize the coeffs
-        // and measure the distortion.
-        result = ComputePSNR();
       }
+    } else {
+      // if we're just targeting PSNR, we don't need to compute the run/levels
+      // within the loop. We just need to quantize the coeffs and measure the
+      // distortion.
+      result = ComputePSNR();
     }
     if (DBG_PRINT) printf("pass #%d: q=%.2f value:%.2f ",
                           search_hook_->pass, search_hook_->q, result);
@@ -404,6 +402,10 @@ uint64_t Encoder::ComputePSNRSlice(int y_start, int y_end) const {
 }
 
 float Encoder::ComputePSNR() const {
+#if !defined(SJPEG_NO_MULTITHREADING)
+  const int num_slices = GetNumSlices(mb_h_, mb_w_ * mb_h_);
+  if (num_slices > 1) return ComputePSNRMultiThreaded(num_slices);
+#endif
   const uint64_t error = ComputePSNRSlice(0, mb_h_);
   const size_t nb_mbs = static_cast<size_t>(mb_w_) * mb_h_;
   return GetPSNR(error, 64ull * nb_mbs * mcu_blocks_);
