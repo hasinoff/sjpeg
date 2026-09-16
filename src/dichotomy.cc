@@ -114,21 +114,10 @@ void Encoder::LoopScan() {
   const int search_threads =
       search_hook_->for_size ? std::min(aq_threads, total_intervals)
                              : aq_threads;
-#if !defined(SJPEG_NO_MULTITHREADING)
-  if (aq_threads > 1) {
-    if (use_adaptive_quant_) {
-      CollectHistogramsMultiThreaded(aq_threads);
-    } else {
-      CollectCoeffsMultiThreaded(aq_threads);
-    }
-  } else
-#endif
-  {
-    if (use_adaptive_quant_) {
-      CollectHistograms();
-    } else {
-      CollectCoeffs();   // we just need the coeffs
-    }
+  if (use_adaptive_quant_) {
+    CollectHistograms();
+  } else {
+    CollectCoeffs();   // we just need the coeffs
   }
 
   const size_t nb_mbs = mb_w_ * mb_h_ * mcu_blocks_;

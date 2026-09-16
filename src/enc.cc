@@ -366,6 +366,13 @@ void Encoder::CollectCoeffsSlice(int y_start, int y_end, uint8_t* rep_buf) {
 }
 
 void Encoder::CollectCoeffs() {
+#if !defined(SJPEG_NO_MULTITHREADING)
+  const int num_slices = GetNumSlices(mb_h_, mb_w_ * mb_h_);
+  if (num_slices > 1) {
+    CollectCoeffsMultiThreaded(num_slices);
+    return;
+  }
+#endif
   CollectCoeffsSlice(0, mb_h_, replicated_buffer_);
   have_coeffs_ = true;
 }
@@ -626,18 +633,8 @@ void Encoder::SinglePassEncode() {
   const int num_mcus = mb_w_ * mb_h_;
 
   if (use_adaptive_quant_) {
-    // Histogram analysis + derive optimal quant matrices. Progressive mode
-    // isn't parallelized, hence the cap to 1 slice when it applies.
-    const int aq_threads =
-        (prog_luma_split_ != 64) ? 1 : GetNumSlices(mb_h_, num_mcus);
-#if !defined(SJPEG_NO_MULTITHREADING)
-    if (aq_threads > 1) {
-      CollectHistogramsMultiThreaded(aq_threads);
-    } else
-#endif
-    {
-      CollectHistograms();
-    }
+    // Histogram analysis + derive optimal quant matrices.
+    CollectHistograms();
     AnalyseHisto();
   }
 
