@@ -105,6 +105,7 @@ endif
 
 
 ifeq ($(HAVE_AVX2), 1)
+SJPEG_OBJS += src/colors_rgb_avx2.o
 SJPEG_OBJS += src/fdct_avx2.o
 SJPEG_OBJS += src/histogram_avx2.o
 SJPEG_OBJS += src/quantize_avx2.o
@@ -224,6 +225,7 @@ DIST_FILES= \
          src/bit_writer.cc  \
          src/bit_writer.h  \
          src/colors_rgb.cc  \
+         src/colors_rgb_avx2.cc  \
          src/dichotomy.cc  \
          src/enc.cc  \
          src/encoders.cc  \

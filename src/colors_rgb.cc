@@ -410,6 +410,18 @@ static void Get16x16Block_RGBA_SSE2(const uint8_t* data, int step,
 #endif    // SJPEG_USE_SSE2
 
 ///////////////////////////////////////////////////////////////////////////////
+// AVX2-version for 16x16 blocks
+
+#if defined(SJPEG_HAVE_AVX2)
+
+void Get16x16Block_AVX2(const uint8_t* data, int step, int16_t* blocks);
+void Get16x16Block_BGRA_AVX2(const uint8_t* data, int step, int16_t* blocks);
+void Get16x16Block_RGBA_AVX2(const uint8_t* data, int step, int16_t* blocks);
+void RowToIndexAVX2(const uint8_t* rgb, int width, uint16_t* dst);
+
+#endif  // SJPEG_HAVE_AVX2
+
+///////////////////////////////////////////////////////////////////////////////
 // NEON-version for 8x8 and 16x16 blocks
 
 #if defined(SJPEG_USE_NEON)
@@ -937,6 +949,11 @@ static void Get16x16Block_RGBA_C(const uint8_t* rgb, int step, int16_t* yuv) {
 
 RGBToYUVBlockFunc GetBlockFunc(SjpegYUVMode yuv_mode, PixelFormat fmt) {
   if (fmt == kBGRAInput) {
+#if defined(SJPEG_HAVE_AVX2)
+    if (SupportsAVX2() && yuv_mode == SJPEG_YUV_420) {
+      return Get16x16Block_BGRA_AVX2;
+    }
+#endif
 #if defined(SJPEG_USE_SSE2)
     if (SupportsSSE2())
       return (yuv_mode == SJPEG_YUV_444)   ? Get8x8Block_BGRA_SSE2
@@ -953,6 +970,11 @@ RGBToYUVBlockFunc GetBlockFunc(SjpegYUVMode yuv_mode, PixelFormat fmt) {
                                          : Get8x8Block_Y_BGRA_C;
   }
   if (fmt == kRGBAInput) {
+#if defined(SJPEG_HAVE_AVX2)
+    if (SupportsAVX2() && yuv_mode == SJPEG_YUV_420) {
+      return Get16x16Block_RGBA_AVX2;
+    }
+#endif
 #if defined(SJPEG_USE_SSE2)
     if (SupportsSSE2())
       return (yuv_mode == SJPEG_YUV_444)   ? Get8x8Block_RGBA_SSE2
@@ -968,6 +990,11 @@ RGBToYUVBlockFunc GetBlockFunc(SjpegYUVMode yuv_mode, PixelFormat fmt) {
            : (yuv_mode == SJPEG_YUV_420) ? Get16x16Block_RGBA_C
                                          : Get8x8Block_Y_RGBA_C;
   }
+#if defined(SJPEG_HAVE_AVX2)
+  if (SupportsAVX2() && yuv_mode == SJPEG_YUV_420) {
+    return Get16x16Block_AVX2;
+  }
+#endif
 #if defined(SJPEG_USE_SSE2)
   if (SupportsSSE2()) return (yuv_mode == SJPEG_YUV_444) ? Get8x8Block_SSE2 :
                              (yuv_mode == SJPEG_YUV_420) ? Get16x16Block_SSE2 :
@@ -1153,6 +1180,9 @@ void RowToIndexNEON(const uint8_t* rgb, int width, uint16_t* dst) {
 
 
 RGBToIndexRowFunc GetRowFunc() {
+#if defined(SJPEG_HAVE_AVX2)
+  if (SupportsAVX2()) return RowToIndexAVX2;
+#endif
 #if defined(SJPEG_USE_SSE2)
   if (SupportsSSE2()) return RowToIndexSSE2;
 #elif defined(SJPEG_USE_NEON)

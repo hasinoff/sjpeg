@@ -29,6 +29,10 @@
 #include "sjpegi.h"
 #include "sjpeg.h"
 
+namespace sjpeg {
+extern bool ForceSlowCImplementation;
+}  // namespace sjpeg
+
 namespace {
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -585,6 +589,40 @@ SJPEG_TEST(Riskiness) {
   SJPEG_CHECK(EncodeRGB(gray, kWidth, kHeight, param, &out));
   uint8_t quant[2][64];
   SJPEG_CHECK(SjpegFindQuantizer(out, quant) == 1);
+}
+
+SJPEG_TEST(RowToIndex) {
+  const auto simd_func = sjpeg::GetRowFunc();
+  sjpeg::ForceSlowCImplementation = true;
+  const auto c_func = sjpeg::GetRowFunc();
+  sjpeg::ForceSlowCImplementation = false;
+
+  const int kEdgeValues[] = {0, 85, 128, 170, 255};
+  for (int edge : kEdgeValues) {
+    for (int w = 1; w <= 64; ++w) {
+      std::vector<uint8_t> rgb(w * 3, edge);
+      std::vector<uint16_t> dst_simd(w, 0);
+      std::vector<uint16_t> dst_c(w, 0);
+      simd_func(rgb.data(), w, dst_simd.data());
+      c_func(rgb.data(), w, dst_c.data());
+      for (int i = 0; i < w; ++i) {
+        SJPEG_CHECK(dst_simd[i] == dst_c[i]);
+      }
+    }
+  }
+  for (int w = 1; w <= 64; ++w) {
+    std::vector<uint8_t> rgb(w * 3);
+    for (int i = 0; i < w * 3; ++i) {
+      rgb[i] = (i * 29 + 85) % 256;
+    }
+    std::vector<uint16_t> dst_simd(w, 0);
+    std::vector<uint16_t> dst_c(w, 0);
+    simd_func(rgb.data(), w, dst_simd.data());
+    c_func(rgb.data(), w, dst_c.data());
+    for (int i = 0; i < w; ++i) {
+      SJPEG_CHECK(dst_simd[i] == dst_c[i]);
+    }
+  }
 }
 
 // TARGET_SIZE converges by comparing ComputeSize(), which adds HeaderSize(),
