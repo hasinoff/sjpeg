@@ -35,11 +35,20 @@
 //  5. Unrolls across 4 pipelined blocks (32 pixels per iteration in the main
 //     loop) to maximize instruction throughput and saturate the load buffer.
 //
-// Note on instruction set: All vector operations in Process8Pixels use 128-bit
-// SSE2 instructions. When compiled with -mavx2, the compiler emits 3-operand
-// VEX-prefixed instructions (e.g. vpaddd, vpsubw) to eliminate register copies.
+// Microarchitectural note:
+// While this file is compiled with -mavx2, Process8Pixels uses 128-bit vector
+// operations (__m128i) unrolled across 4 blocks (32 pixels/loop). Widening
+// vector registers to 256 bits (__m256i) was evaluated and found to be ~15%
+// slower (614 MP/s vs 721 MP/s). Because AVX2 lacks byte-level gather, lookups
+// are inherently scalar; packing 16 scalar scores into a 256-bit register
+// requires cross-lane vinserti128 instructions which bottleneck on Port 5 and
+// cause register spills. In contrast, 128-bit vectors pack cleanly from two
+// 64-bit words via vmovq, and unrolling across 32 pixels issues 96 byte loads
+// per loop, saturating the CPU's load buffer and achieving 720+ MP/s.
 //
 // Author: Skal (pascal.massimino@gmail.com)
+
+#include <cstdint>
 
 #define SJPEG_NEED_ASM_HEADERS
 #include "sjpegi.h"
@@ -121,8 +130,8 @@ static inline void Process8Pixels(
 // Caller needs to handle the [return value, size) remainder using C-version.
 int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
                           int size, int noise_level,
-                          int64_t* const score_sum, int64_t* const score_num,
-                          int64_t* const gray_num) {
+                          int64_t* score_sum, int64_t* score_num,
+                          int64_t* gray_num) {
   if (kRowTable[0] == nullptr) {
     InitRowTable();
   }
