@@ -54,10 +54,6 @@
 #define SJPEG_USE_AVX2
 #endif
 
-// Experimental: gather-based AVX2 riskiness scoring (src/riskiness_avx2.cc).
-// Off by default (gather throughput is erratic on early AVX2 hardware)
-// #define SJPEG_USE_AVX2_RISKINESS
-
 // Gather-based AVX2 variant of the Sharp RGB->YUV gamma-table lookups
 // Bit-exact with C-variant, ~1.15x faster.
 #define SJPEG_USE_AVX2_YUV_GATHER

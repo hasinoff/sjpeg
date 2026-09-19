@@ -241,7 +241,7 @@ static int BitReversal16b(int v, int bits) {
   return r;
 }
 
-#if defined(SJPEG_HAVE_AVX2) && defined(SJPEG_USE_AVX2_RISKINESS)
+#if defined(SJPEG_HAVE_AVX2)
 namespace sjpeg {
 // defined in riskiness_avx2.cc, built separately with -mavx2 (see Makefile)
 // so this file itself doesn't need an AVX2 target.
@@ -260,7 +260,7 @@ static SjpegYUVMode RiskinessImpl(const uint8_t* rgb,
                                   int width, int height, int stride,
                                   float* risk, bool full_scan) {
   const sjpeg::RGBToIndexRowFunc cvrt_func = sjpeg::GetRowFunc();
-#if defined(SJPEG_HAVE_AVX2) && defined(SJPEG_USE_AVX2_RISKINESS)
+#if defined(SJPEG_HAVE_AVX2)
   const bool use_avx2_riskiness = sjpeg::SupportsAVX2();
 #endif
   const int s = sjpeg::kRGBSize;  // shortcut
@@ -322,7 +322,7 @@ static SjpegYUVMode RiskinessImpl(const uint8_t* rgb,
   // scores one adjacent row-pair (row1 = above, row2 = below)
   const auto ScoreRow = [&]() {
     int i = 0;
-#if defined(SJPEG_HAVE_AVX2) && defined(SJPEG_USE_AVX2_RISKINESS)
+#if defined(SJPEG_HAVE_AVX2)
     if (use_avx2_riskiness) {
       i = sjpeg::RiskinessScoreRowAVX2(&row1[0], &row2[0], width - 1,
                                        kNoiseLevel, &score_sum, &score_num,

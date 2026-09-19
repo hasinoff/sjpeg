@@ -587,6 +587,85 @@ SJPEG_TEST(Riskiness) {
   SJPEG_CHECK(SjpegFindQuantizer(out, quant) == 1);
 }
 
+}  // namespace
+
+#if defined(__x86_64__) || defined(_M_X64)
+namespace sjpeg {
+extern int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
+                                 int size, int noise_level,
+                                 int64_t* const score_sum,
+                                 int64_t* const score_num,
+                                 int64_t* const gray_num);
+}  // namespace sjpeg
+#endif
+
+namespace {
+
+#if defined(__x86_64__) || defined(_M_X64)
+SJPEG_TEST(RiskinessScoreRow) {
+  if (!sjpeg::SupportsAVX2()) return;
+  const int kNoiseLevel = 4;
+  const int s = sjpeg::kRGBSize;
+  const int kRGB3 = s * s * s;
+  const int gray = (s / 2) * (1 + s) * s;
+  const int gray_min = gray - gray % s;
+
+  const int kMaxWidth = 2048;
+  std::vector<uint16_t> row1(kMaxWidth + 16), row2(kMaxWidth + 16);
+  for (int i = 0; i < kMaxWidth + 16; ++i) {
+    row1[i] = static_cast<uint16_t>((i * 17 + 23) % kRGB3);
+    row2[i] = static_cast<uint16_t>((i * 31 + 47) % kRGB3);
+  }
+
+  const int kTestWidths[] = {
+      1, 2, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65,
+      127, 128, 255, 256, 333, 512, 1001, 1024, 1920, 2048};
+
+  for (size_t w_idx = 0; w_idx < ARRAY_SIZE(kTestWidths); ++w_idx) {
+    const int width = kTestWidths[w_idx];
+    int64_t score_sum_simd = 0, score_num_simd = 0, gray_num_simd = 0;
+    int i_simd = sjpeg::RiskinessScoreRowAVX2(
+        row1.data(), row2.data(), width - 1, kNoiseLevel,
+        &score_sum_simd, &score_num_simd, &gray_num_simd);
+
+    // Complete remainder with scalar C
+    for (int i = i_simd; i < width - 1; ++i) {
+      const int idx0 = row1[i + 0];
+      const int idx1 = row1[i + 1];
+      const int idx2 = row2[i + 0];
+      const int score = sjpeg::kSharpnessScore[idx0 + kRGB3 * idx1]
+                      + sjpeg::kSharpnessScore[idx0 + kRGB3 * idx2]
+                      + sjpeg::kSharpnessScore[idx1 + kRGB3 * idx2];
+      if (score > kNoiseLevel) {
+        score_sum_simd += score;
+        score_num_simd += 1;
+      }
+      gray_num_simd += ((uint32_t)(idx0 - gray_min) < (uint32_t)s);
+    }
+
+    // Pure scalar C reference for entire row
+    int64_t score_sum_c = 0, score_num_c = 0, gray_num_c = 0;
+    for (int i = 0; i < width - 1; ++i) {
+      const int idx0 = row1[i + 0];
+      const int idx1 = row1[i + 1];
+      const int idx2 = row2[i + 0];
+      const int score = sjpeg::kSharpnessScore[idx0 + kRGB3 * idx1]
+                      + sjpeg::kSharpnessScore[idx0 + kRGB3 * idx2]
+                      + sjpeg::kSharpnessScore[idx1 + kRGB3 * idx2];
+      if (score > kNoiseLevel) {
+        score_sum_c += score;
+        score_num_c += 1;
+      }
+      gray_num_c += ((uint32_t)(idx0 - gray_min) < (uint32_t)s);
+    }
+
+    SJPEG_CHECK(score_sum_simd == score_sum_c);
+    SJPEG_CHECK(score_num_simd == score_num_c);
+    SJPEG_CHECK(gray_num_simd == gray_num_c);
+  }
+}
+#endif
+
 // TARGET_SIZE converges by comparing ComputeSize(), which adds HeaderSize(),
 // against the requested value. SJPEG_YUV_400 writes a single quantization
 // matrix where the other modes write two: charging it for both (67 bytes)
