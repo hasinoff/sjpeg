@@ -39,6 +39,14 @@
 #define SJPEG_UNROLL(n)
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define SJPEG_INLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define SJPEG_INLINE __forceinline
+#else
+#define SJPEG_INLINE inline
+#endif
+
 // Progressive (spectral-split-only) encoding; on by default. Pass
 // -DSJPEG_NO_PROGRESSIVE to strip the feature's code out entirely.
 

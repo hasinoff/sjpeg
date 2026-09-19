@@ -589,7 +589,7 @@ SJPEG_TEST(Riskiness) {
 
 }  // namespace
 
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(SJPEG_HAVE_AVX2)
 namespace sjpeg {
 extern int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
                                  int size, int noise_level,
@@ -600,7 +600,7 @@ extern int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
 
 namespace {
 
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(SJPEG_HAVE_AVX2)
 SJPEG_TEST(RiskinessScoreRow) {
   if (!sjpeg::SupportsAVX2()) return;
   const int kNoiseLevel = 4;

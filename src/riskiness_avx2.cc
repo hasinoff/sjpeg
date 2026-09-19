@@ -87,8 +87,7 @@ static inline int32_t HorizontalSumEpi16(__m128i v) {
 // Evaluates 8 pixels of riskiness scores starting at (row1, row2).
 // Computes 3-way pair sharpness scores via 2D row table lookups and vectorizes
 // chroma neutrality tests, noise thresholding, and score accumulation.
-__attribute__((always_inline))
-static inline void Process8Pixels(
+static SJPEG_INLINE void Process8Pixels(
     const uint16_t* const row1, const uint16_t* const row2,
     __m128i min_16, __m128i max_16, __m128i noise_vec_16, __m128i ones_16,
     __m128i* const gray_vec_16, __m128i* const num_vec_16,
