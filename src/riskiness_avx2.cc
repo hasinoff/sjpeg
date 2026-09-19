@@ -176,7 +176,8 @@ int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
                    ones_16, &gray_vec_16, &num_vec_16, &sum_vec_32);
   }
 
-  // Trailing 8-pixel block if size is not a multiple of 16.
+  // Trailing 8-pixel block. Any remaining [i, size) pixels (< 8) are returned
+  // to the caller to finish with scalar C.
   for (; i + 8 <= size; i += 8) {
     Process8Pixels(row1 + i, row2 + i, min_16, max_16, noise_vec_16, ones_16,
                    &gray_vec_16, &num_vec_16, &sum_vec_32);
