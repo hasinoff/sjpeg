@@ -527,14 +527,27 @@ bool EncodeYUV420(const uint8_t* Y, int Y_stride,
 class EncoderSharp420 final : public EncoderYUV420 {
  public:
   EncoderSharp420(int W, int H, const uint8_t* const rgb, int step,
-                  ByteSink* const sink, MemoryManager* const memory = nullptr)
+                  ByteSink* const sink, MemoryManager* const memory = nullptr,
+                  int num_threads = 1)
       : EncoderYUV420(nullptr, 0, nullptr, 0, nullptr, 0, W, H, sink, memory),
         yuv_memory_(nullptr) {
+    SetNumThreads(num_threads);
+    if (W <= 0 || H <= 0 || W > kMaxDimension || H > kMaxDimension) {
+      ok_ = false;
+      return;
+    }
     const int uv_w = (W + 1) >> 1;
     const int uv_h = (H + 1) >> 1;
-    const size_t y_size = (size_t)W * H;
-    const size_t uv_size = (size_t)uv_w * uv_h;
-    yuv_memory_ = Alloc<uint8_t>(y_size + 2 * uv_size);
+    const uint64_t y_size64 = static_cast<uint64_t>(W) * H;
+    const uint64_t uv_size64 = static_cast<uint64_t>(uv_w) * uv_h;
+    const uint64_t total_size64 = y_size64 + 2ULL * uv_size64;
+    if (total_size64 > SIZE_MAX) {
+      ok_ = false;
+      return;
+    }
+    const size_t y_size = static_cast<size_t>(y_size64);
+    const size_t uv_size = static_cast<size_t>(uv_size64);
+    yuv_memory_ = Alloc<uint8_t>(static_cast<size_t>(total_size64));
     ok_ = (yuv_memory_ != nullptr);
     if (ok_) {
       y_ = yuv_memory_;
@@ -546,7 +559,8 @@ class EncoderSharp420 final : public EncoderYUV420 {
       ok_ = ApplySharpYUVConversion(rgb, W, H, step,
                                     const_cast<uint8_t*>(y_),
                                     const_cast<uint8_t*>(u_),
-                                    const_cast<uint8_t*>(v_));
+                                    const_cast<uint8_t*>(v_),
+                                    this);
     }
   }
   ~EncoderSharp420() override { Free(yuv_memory_); }
@@ -560,7 +574,8 @@ class EncoderSharp420 final : public EncoderYUV420 {
 
 Encoder* EncoderFactory(const uint8_t* rgb, int W, int H, int stride,
                         SjpegYUVMode yuv_mode, ByteSink* const sink,
-                        PixelFormat fmt, MemoryManager* const memory) {
+                        PixelFormat fmt, MemoryManager* const memory,
+                        int num_threads) {
   if (yuv_mode == SJPEG_YUV_AUTO) {
     yuv_mode = SjpegRiskiness(rgb, W, H, stride, nullptr);
   }
@@ -569,7 +584,8 @@ Encoder* EncoderFactory(const uint8_t* rgb, int W, int H, int stride,
   if (yuv_mode == SJPEG_YUV_420) {
     enc = new (std::nothrow) Encoder420(W, H, rgb, stride, sink, fmt, memory);
   } else if (yuv_mode == SJPEG_YUV_SHARP) {
-    enc = new (std::nothrow) EncoderSharp420(W, H, rgb, stride, sink, memory);
+    enc = new (std::nothrow) EncoderSharp420(W, H, rgb, stride, sink, memory,
+                                             num_threads);
   } else if (yuv_mode == SJPEG_YUV_444) {
     enc = new (std::nothrow) Encoder444(W, H, rgb, stride, sink, fmt, memory);
   } else if (yuv_mode == SJPEG_YUV_400) {
