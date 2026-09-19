@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// AVX2/SIMD implementation of the inner loop of SjpegRiskiness() (jpeg_tools.cc).
+// AVX2/SIMD inner loop of SjpegRiskiness() (jpeg_tools.cc).
 //
 // Method description:
 // SjpegRiskiness() scores visual sharpness and complexity of neighboring pixels
 // across two consecutive rows (row1 = above, row2 = below) using a precomputed
 // 3-way sharpness table (kSharpnessScore, size 343 * 343).
 //
-// Upstream originally evaluated an AVX2 variant using vpgatherdd, which was
-// disabled by default (SJPEG_USE_AVX2_RISKINESS) due to severe gather stalls on
-// older hardware (Haswell/Excavator) and high port-5 pressure.
+// SjpegRiskiness previously included an experimental AVX2 variant using
+// vpgatherdd, which was disabled by default (SJPEG_USE_AVX2_RISKINESS) due to
+// severe gather stalls on older hardware (Haswell/Excavator) and high port-5
+// pressure.
 //
 // This implementation eliminates hardware gather instructions entirely:
 //  1. Precomputes an array of row pointers (kRowTable[343], 2.7 KB), which fits
@@ -31,15 +32,14 @@
 //  3. Packs 8 scores into a 128-bit vector as 16-bit integers.
 //  4. Uses 16-bit SIMD math to evaluate the chroma neutrality test, noise
 //     threshold test, and score accumulation (using _mm_madd_epi16).
-//  5. Unrolls by 2 (16 pixels per iteration in the main loop) to maximize
-//     instruction throughput and pipeline latency hiding.
+//  5. Unrolls across 4 pipelined blocks (32 pixels per iteration in the main
+//     loop) to maximize instruction throughput and saturate the load buffer.
 //
 // Note on instruction set: All vector operations in Process8Pixels use 128-bit
 // SSE2 instructions. When compiled with -mavx2, the compiler emits 3-operand
 // VEX-prefixed instructions (e.g. vpaddd, vpsubw) to eliminate register copies.
 //
 // Author: Skal (pascal.massimino@gmail.com)
-//         Sam Hasinoff (hasinoff@google.com)
 
 #define SJPEG_NEED_ASM_HEADERS
 #include "sjpegi.h"
@@ -93,7 +93,8 @@ static inline void Process8Pixels(
   *gray_vec_16 = _mm_sub_epi16(*gray_vec_16, _mm_and_si128(ge_mask, lt_mask));
 
   // 2. 3-way sharpness score lookups via kRowTable:
-  //    score = table[idx0 + K*idx1] + table[idx0 + K*idx2] + table[idx1 + K*idx2]
+  //    score = table[idx0 + K*idx1] + table[idx0 + K*idx2] +
+  //            table[idx1 + K*idx2]
   //    where idx0 = row1[k], idx1 = row1[k + 1], idx2 = row2[k].
   auto score_at = [&](int k) -> uint32_t {
     const uint8_t* const row_v = kRowTable[row2[k]];
@@ -141,12 +142,12 @@ int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
   // lane per row, which stays safely within the signed 16-bit limit (32767).
   // sum_vec_32 uses 32-bit accumulators via _mm_madd_epi16, which stays well
   // under the 32-bit limit (65534/8 * 765 ~= 6.3M).
-  __m128i sum_vec_32 = _mm_setzero_si128();  // scores above the noise level
-  __m128i num_vec_16 = _mm_setzero_si128();  // number of sum_vec
-  __m128i gray_vec_16 = _mm_setzero_si128(); // samples with neutral chroma
+  __m128i sum_vec_32 = _mm_setzero_si128();   // scores above the noise level
+  __m128i num_vec_16 = _mm_setzero_si128();   // number of sum_vec
+  __m128i gray_vec_16 = _mm_setzero_si128();  // samples with neutral chroma
 
   int i = 0;
-  // Main unrolled loop: process 32 pixels per iteration across 4 pipelined blocks.
+  // Main unrolled loop: process 32 pixels per iteration (4 pipelined blocks).
   for (; i + 32 <= size; i += 32) {
     Process8Pixels(row1 + i + 0, row2 + i + 0, min_16, max_16, noise_vec_16,
                    ones_16, &gray_vec_16, &num_vec_16, &sum_vec_32);

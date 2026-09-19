@@ -247,9 +247,8 @@ namespace sjpeg {
 // so this file itself doesn't need an AVX2 target.
 extern int RiskinessScoreRowAVX2(const uint16_t* row1, const uint16_t* row2,
                                  int size, int noise_level,
-                                 int64_t* const score_sum,
-                                 int64_t* const score_num,
-                                 int64_t* const gray_num);
+                                 int64_t* score_sum, int64_t* score_num,
+                                 int64_t* gray_num);
 }  // namespace sjpeg
 #endif
 
