@@ -525,25 +525,9 @@ void RowToIndexAVX2(const uint8_t* rgb, int width, uint16_t* dst) {
     width -= 16;
   }
 
-  // Scalar fallback for remaining pixels (< 16)
-  while (width > 0) {
-    const int r = rgb[0], g = rgb[1], b = rgb[2];
-    const int y = (19595 * r + 38469 * g + 7471 * b + (1 << 16 >> 1)) >> 16;
-    const int u =
-        128 + ((-11059 * r - 21709 * g + 32768 * b + (1 << 16 >> 1)) >> 16);
-    const int v =
-        128 + ((32768 * r - 27439 * g - 5329 * b + (1 << 16 >> 1)) >> 16);
-    const int y_c = (y < 0) ? 0 : (y > 255) ? 255 : y;
-    const int u_c = (u < 0) ? 0 : (u > 255) ? 255 : u;
-    const int v_c = (v < 0) ? 0 : (v > 255) ? 255 : v;
-    const int y_idx = (y_c * (0x0101u * (sjpeg::kRGBSize - 1))) >> 16;
-    const int u_idx = (u_c * (0x0101u * (sjpeg::kRGBSize - 1))) >> 16;
-    const int v_idx = (v_c * (0x0101u * (sjpeg::kRGBSize - 1))) >> 16;
-    const int idx = y_idx + u_idx * sjpeg::kRGBSize +
-                    v_idx * sjpeg::kRGBSize * sjpeg::kRGBSize;
-    *dst++ = idx;
-    rgb += 3;
-    --width;
+  // Fallback for remaining pixels (< 16)
+  if (width > 0) {
+    RowToIndexC(rgb, width, dst);
   }
 }
 

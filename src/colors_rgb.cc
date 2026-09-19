@@ -1051,11 +1051,6 @@ int ConvertToYUVIndex(const uint8_t* const rgb) {
   return (y + u * sjpeg::kRGBSize + v * sjpeg::kRGBSize * sjpeg::kRGBSize);
 }
 
-void RowToIndexC(const uint8_t* rgb, int width, uint16_t* dst) {
-  for (int i = 0; i < width; ++i, rgb += 3) {
-    dst[i] = ConvertToYUVIndex(rgb);
-  }
-}
 
 #if defined(SJPEG_USE_SSE2)
 void RowToIndexSSE2(const uint8_t* rgb, int width, uint16_t* dst) {
@@ -1177,6 +1172,12 @@ void RowToIndexNEON(const uint8_t* rgb, int width, uint16_t* dst) {
 #endif    // SJPEG_USE_NEON
 
 }  // namespace
+
+void RowToIndexC(const uint8_t* rgb, int width, uint16_t* dst) {
+  for (int i = 0; i < width; ++i, rgb += 3) {
+    dst[i] = ConvertToYUVIndex(rgb);
+  }
+}
 
 
 RGBToIndexRowFunc GetRowFunc() {

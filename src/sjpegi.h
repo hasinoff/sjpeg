@@ -145,6 +145,7 @@ extern RGBToYUVBlockFunc GetBlockFunc(SjpegYUVMode mode,
 typedef void (*RGBToIndexRowFunc)(const uint8_t* src, int width,
                                   uint16_t* dst);
 extern RGBToIndexRowFunc GetRowFunc();
+void RowToIndexC(const uint8_t* rgb, int width, uint16_t* dst);
 
 // Enhanced slower RGB->YUV conversion:
 //  y_plane[] has dimension W x H, whereas u_plane[] and v_plane[] have
